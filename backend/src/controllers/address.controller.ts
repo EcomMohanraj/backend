@@ -8,8 +8,7 @@ export const addressController = {
       if (!req.user) {
         return res.status(401).json({ success: false, error: "Unauthorized." });
       }
-      
-
+    
       const customer = await prisma.customer.findUnique({
         where: { userId: req.user.userId }
       });
