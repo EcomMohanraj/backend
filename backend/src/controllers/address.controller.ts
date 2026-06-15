@@ -11,11 +11,9 @@ export const addressController = {
       const customer = await prisma.customer.findUnique({
         where: { userId: req.user.userId }
       });
-
       if (!customer) {
         return res.json([]);
       }
-
       const addresses = await prisma.address.findMany({
         where: { customerId: customer.id },
         orderBy: { createdAt: "desc" }
