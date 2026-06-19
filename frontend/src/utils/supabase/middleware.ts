@@ -28,11 +28,19 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Refresh user session on each request
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch (err) {
+    // Ignore potential errors when Supabase is not configured
+  }
+
+  const hasLocalActive = request.cookies.get('milky_session_active')?.value === 'true'
 
   // Protect dashboard routes
   if (request.nextUrl.pathname.startsWith('/dashboard')) {
-    if (!user) {
+    if (!user && !hasLocalActive) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
@@ -45,7 +53,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === '/register' ||
     request.nextUrl.pathname === '/forgot-password'
   ) {
-    if (user) {
+    if (user || hasLocalActive) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

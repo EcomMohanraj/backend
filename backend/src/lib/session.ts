@@ -11,11 +11,19 @@ export interface SessionPayload {
   name: string;
 }
 
-export async function encryptSession(payload: SessionPayload) {
+export async function generateAccessToken(payload: SessionPayload) {
   return await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime("15m") // Short lived
+    .sign(SECRET_KEY);
+}
+
+export async function generateRefreshToken(payload: SessionPayload) {
+  return await new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d") // Long lived
     .sign(SECRET_KEY);
 }
 
@@ -43,7 +51,6 @@ export async function verifySupabaseToken(token: string): Promise<SupabaseTokenP
   try {
     const secret = process.env.SUPABASE_JWT_SECRET;
     if (!secret) {
-      console.warn("WARNING: SUPABASE_JWT_SECRET is not set in environment variables. JWT verification will fail.");
       return null;
     }
     const secretKey = new TextEncoder().encode(secret);
@@ -52,7 +59,6 @@ export async function verifySupabaseToken(token: string): Promise<SupabaseTokenP
     });
     return payload as unknown as SupabaseTokenPayload;
   } catch (error) {
-    console.error("Supabase JWT verification failed:", error);
     return null;
   }
 }

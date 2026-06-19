@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { KeyRound, Mail, User, Phone, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function Register() {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -27,6 +29,39 @@ export default function Register() {
     }
 
     try {
+      // 1. Try local Express backend signup first
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+      try {
+        const response = await fetch(`${apiUrl}/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name, email, phone: phone || null, password })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            // Local signup succeeded! Automatically log in
+            document.cookie = `milky_session_active=true; path=/; max-age=${7 * 24 * 60 * 60}`
+            router.push('/dashboard')
+            router.refresh()
+            return
+          }
+        } else {
+          const data = await response.json().catch(() => ({}))
+          if (data.error) {
+            setError(data.error)
+            setLoading(false)
+            return
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend register connection failed, falling back to Supabase:', backendErr)
+      }
+
+      // 2. Fallback to Supabase
       const supabase = createClient()
       
       // Pass the name and phone in options.data so they are attached as user_metadata

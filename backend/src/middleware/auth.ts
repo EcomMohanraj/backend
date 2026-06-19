@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifySupabaseToken, SessionPayload } from "../lib/session";
+import { verifySupabaseToken, decryptSession, SessionPayload } from "../lib/session";
 import { prisma } from "../lib/prisma";
 
 export interface AuthenticatedRequest extends Request {
@@ -9,21 +9,51 @@ export interface AuthenticatedRequest extends Request {
 export async function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
     let token = "";
-    // Check Authorization header first, then fall back to cookie session
+    // Check Authorization header first, then fall back to cookies
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.split(" ")[1];
     } else {
-      token = req.cookies.milky_session || req.cookies["sb-access-token"] || "";
+      token = req.cookies.milky_access_token || req.cookies.milky_session || req.cookies["sb-access-token"] || "";
     }
 
     if (!token) {
       return res.status(401).json({ success: false, error: "Unauthorized: No session token provided" });
     }
 
+    // Try decrypting as a local session token first
+    const localSession = await decryptSession(token);
+    if (localSession) {
+      // Fetch user from DB to verify blocking / soft delete
+      const user = await prisma.user.findUnique({
+        where: { id: localSession.userId }
+      });
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: "Unauthorized: User not found in database" });
+      }
+
+      if (user.blocked) {
+        return res.status(403).json({ success: false, error: "Access Denied: Your account has been suspended by an administrator." });
+      }
+
+      if (user.deletedAt) {
+        return res.status(401).json({ success: false, error: "Unauthorized: User account has been deactivated." });
+      }
+
+      req.user = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name
+      };
+      return next();
+    }
+
+    // Fallback: Verify as a Supabase JWT Token
     const decoded = await verifySupabaseToken(token);
     if (!decoded) {
-      return res.status(401).json({ success: false, error: "Unauthorized: Invalid or expired token" });
+      return res.status(401).json({ success: false, error: "Unauthorized: Invalid or expired session token" });
     }
 
     // Query user profile in local database
@@ -114,6 +144,14 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
       return res.status(500).json({ success: false, error: "Authentication profile sync failed." });
     }
 
+    if (user.blocked) {
+      return res.status(403).json({ success: false, error: "Access Denied: Your account has been suspended by an administrator." });
+    }
+
+    if (user.deletedAt) {
+      return res.status(401).json({ success: false, error: "Unauthorized: User account has been deactivated." });
+    }
+
     // Set local request user matching old session schema for API compatibility
     req.user = {
       userId: user.id,
@@ -130,8 +168,15 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
 }
 
 export function adminMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  if (!req.user || req.user.role !== "admin") {
+  if (!req.user || (req.user.role !== "admin" && req.user.role !== "super-admin")) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required" });
+  }
+  next();
+}
+
+export function superAdminMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user || req.user.role !== "super-admin") {
+    return res.status(403).json({ success: false, error: "Forbidden: Super Admin access required" });
   }
   next();
 }

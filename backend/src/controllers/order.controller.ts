@@ -264,5 +264,188 @@ export const orderController = {
       console.error("Track order error:", err);
       return res.status(500).json({ success: false, error: "Failed to query order tracking status." });
     }
+  },
+
+  async getInvoice(req: AuthenticatedRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, error: "Unauthorized." });
+      }
+
+      const { id } = req.params;
+
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: { include: { product: true } },
+          customer: true
+        }
+      });
+
+      if (!order) {
+        return res.status(404).send("<h1>Order not found</h1>");
+      }
+
+      // Check access permission: admins or the customer themselves
+      if (req.user.role !== "admin" && req.user.role !== "super-admin") {
+        if (order.customer?.userId !== req.user.userId) {
+          return res.status(403).send("<h1>Access Denied: You do not have permission to view this invoice.</h1>");
+        }
+      }
+
+      const settings = await prisma.storeSettings.findUnique({
+        where: { id: "default" }
+      }) || {
+        storeName: "Milky Mushrooms",
+        contactNumber: "+91 99887 76655",
+        email: "contact@milkymushrooms.com",
+        deliveryCharges: 50,
+        taxPercentage: 5
+      };
+
+      const dateStr = order.createdAt.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      const taxAmount = (order.amount * settings.taxPercentage) / (100 + settings.taxPercentage);
+      const subtotal = order.amount - taxAmount;
+
+      const itemsRows = order.items.map(item => `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.95rem;">${item.product?.name || "Deleted Product"}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 0.95rem;">${item.quantity}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.95rem;">₹${item.price.toFixed(2)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.95rem; font-weight: 600;">₹${(item.price * item.quantity).toFixed(2)}</td>
+        </tr>
+      `).join("");
+
+      const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Invoice #${order.id.slice(0, 8)}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; background-color: #f8fafc; padding: 40px 20px; line-height: 1.5; }
+          .invoice-container { max-width: 850px; margin: 0 auto; background: white; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); overflow: hidden; padding: 40px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 32px; }
+          .logo { font-size: 1.8rem; font-weight: 800; color: #10b981; }
+          .subtitle { font-size: 0.85rem; color: #64748b; margin-top: 4px; }
+          .inv-title { text-align: right; }
+          .inv-title h1 { font-size: 2.2rem; color: #0f172a; font-weight: 700; letter-spacing: -0.03em; }
+          .inv-meta { font-size: 0.9rem; color: #64748b; margin-top: 8px; line-height: 1.6; }
+          .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+          .details-card { background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9; padding: 20px; font-size: 0.9rem; line-height: 1.6; }
+          .details-card h3 { font-size: 0.95rem; color: #0f172a; margin-bottom: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+          th { background-color: #f1f5f9; color: #475569; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1; }
+          .totals-wrapper { display: flex; justify-content: flex-end; }
+          .totals-table { width: 320px; font-size: 0.95rem; }
+          .totals-table td { padding: 8px 12px; }
+          .grand-total { font-weight: 700; font-size: 1.25rem; color: #10b981; border-top: 2px solid #10b981; padding-top: 12px !important; }
+          .footer { text-align: center; margin-top: 60px; font-size: 0.85rem; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 24px; line-height: 1.6; }
+          .actions { max-width: 850px; margin: 0 auto 20px auto; display: flex; justify-content: flex-end; gap: 12px; }
+          .btn { display: inline-flex; align-items: center; justify-content: center; background-color: #10b981; color: white; padding: 10px 24px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: background-color 0.2s; }
+          .btn:hover { background-color: #059669; }
+          .btn-secondary { background-color: #fff; color: #475569; border: 1px solid #cbd5e1; }
+          .btn-secondary:hover { background-color: #f1f5f9; }
+          @media print {
+            body { background: white; padding: 0; }
+            .invoice-container { border: none; box-shadow: none; padding: 0; }
+            .actions { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="window.close()">Close Window</button>
+          <button class="btn" onclick="window.print()">Print / Save PDF</button>
+        </div>
+        <div class="invoice-container">
+          <div class="header">
+            <div>
+              <div class="logo">${settings.storeName}</div>
+              <div class="subtitle">E-Commerce Cultivation & Substrate Logistics</div>
+            </div>
+            <div class="inv-title">
+              <h1>INVOICE</h1>
+              <div class="inv-meta">
+                <strong>Invoice No:</strong> INV-${order.id.slice(0, 8).toUpperCase()}<br>
+                <strong>Date:</strong> ${dateStr}<br>
+                <strong>Payment ID:</strong> ${order.paymentId || "COD / Pending"}
+              </div>
+            </div>
+          </div>
+
+          <div class="details-grid">
+            <div class="details-card">
+              <h3>Billed To</h3>
+              <strong>${order.customer?.name || "Customer"}</strong><br>
+              Email: ${order.customer?.email || ""}<br>
+              Phone: ${order.customer?.phone || ""}<br><br>
+              <strong>Shipping Address:</strong><br>
+              ${order.address}
+            </div>
+            <div class="details-card">
+              <h3>Billed From</h3>
+              <strong>${settings.storeName}</strong><br>
+              Email: ${settings.email}<br>
+              Support Phone: ${settings.contactNumber}<br><br>
+              <strong>Store Address:</strong><br>
+              Main Cultivation Hub, Palani Foothills,<br>
+              Tamil Nadu, India
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item Details</th>
+                <th style="text-align: center; width: 10%;">Qty</th>
+                <th style="text-align: right; width: 20%;">Price</th>
+                <th style="text-align: right; width: 20%;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+            </tbody>
+          </table>
+
+          <div class="totals-wrapper">
+            <table class="totals-table">
+              <tr>
+                <td style="color: #64748b;">Subtotal:</td>
+                <td style="text-align: right; font-weight: 500;">₹${subtotal.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">Taxes (${settings.taxPercentage}% included):</td>
+                <td style="text-align: right; font-weight: 500;">₹${taxAmount.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">Delivery Fee:</td>
+                <td style="text-align: right; font-weight: 500;">₹0.00</td>
+              </tr>
+              <tr class="grand-total">
+                <td>Grand Total:</td>
+                <td style="text-align: right;">₹${order.amount.toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="footer">
+            <p>This invoice is electronically generated. Thank you for supporting organic farming!</p>
+            <p style="margin-top: 4px; font-weight: 600;">© ${new Date().getFullYear()} ${settings.storeName}. All Rights Reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+      `;
+
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      console.error("Generate invoice error:", err);
+      return res.status(500).send("<h1>Failed to generate invoice</h1>");
+    }
   }
 };
