@@ -1,5 +1,8 @@
 import './global.css'
 import type { Metadata } from 'next'
+import { CartProvider } from '@/context/CartContext'
+import { WishlistProvider } from '@/context/WishlistContext'
+import { ToastProvider } from '@/context/ToastContext'
 
 export const metadata: Metadata = {
   title: 'Milky Mushrooms | Premium Organic Mushrooms',
@@ -14,7 +17,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
+        <ToastProvider>
+          <CartProvider>
+            <WishlistProvider>
+              {children}
+            </WishlistProvider>
+          </CartProvider>
+        </ToastProvider>
       </body>
     </html>
   )

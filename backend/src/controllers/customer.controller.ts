@@ -99,5 +99,77 @@ export const customerController = {
       console.error("Get customer by id error:", err);
       return res.status(500).json({ success: false, error: "Failed to fetch customer profile details." });
     }
+  },
+
+  async toggleBlock(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        include: { user: true }
+      });
+
+      if (!customer || !customer.userId) {
+        return res.status(404).json({ success: false, error: "Customer or user profile not found." });
+      }
+
+      // Prevent self blocking
+      if (customer.userId === req.user?.userId) {
+        return res.status(400).json({ success: false, error: "You cannot block your own admin account." });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: customer.userId },
+        data: { blocked: !customer.user?.blocked }
+      });
+
+      // Revoke all refresh tokens for this user if blocked
+      if (updatedUser.blocked) {
+        await prisma.refreshToken.deleteMany({
+          where: { userId: updatedUser.id }
+        });
+      }
+
+      return res.json({ success: true, blocked: updatedUser.blocked });
+    } catch (err) {
+      console.error("Toggle block customer error:", err);
+      return res.status(500).json({ success: false, error: "Failed to toggle block status." });
+    }
+  },
+
+  async resetPassword(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+      if (!newPassword) {
+        return res.status(400).json({ success: false, error: "New password is required." });
+      }
+
+      const customer = await prisma.customer.findUnique({
+        where: { id }
+      });
+
+      if (!customer || !customer.userId) {
+        return res.status(404).json({ success: false, error: "Customer not found." });
+      }
+
+      const bcrypt = require("bcryptjs");
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+
+      await prisma.user.update({
+        where: { id: customer.userId },
+        data: { passwordHash }
+      });
+
+      // Revoke all sessions for security to force relogin with new password
+      await prisma.refreshToken.deleteMany({
+        where: { userId: customer.userId }
+      });
+
+      return res.json({ success: true, message: "Customer password reset successfully." });
+    } catch (err) {
+      console.error("Reset password customer error:", err);
+      return res.status(500).json({ success: false, error: "Failed to reset customer password." });
+    }
   }
 };

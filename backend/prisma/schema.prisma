@@ -8,14 +8,17 @@ generator client {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  name         String
-  email        String    @unique
-  passwordHash String?   @map("password_hash")
-  role         String    @default("customer") // "customer" | "admin"
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  customer     Customer?
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  passwordHash  String?        @map("password_hash")
+  role          String         @default("customer") // "customer" | "admin" | "super-admin"
+  blocked       Boolean        @default(false)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
+  customer      Customer?
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -28,6 +31,7 @@ model Customer {
   phone     String?
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
   user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   addresses Address[]
   orders    Order[]
@@ -48,10 +52,12 @@ model Product {
   nutrition   Json?       @default("{}")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
   category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   orderItems  OrderItem[]
   reviews     Review[]
 
+  @@index([categoryId])
   @@map("products")
 }
 
@@ -66,6 +72,7 @@ model Address {
   updatedAt  DateTime @updatedAt @map("updated_at")
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
+  @@index([customerId])
   @@map("addresses")
 }
 
@@ -73,7 +80,7 @@ model Order {
   id         String      @id @default(uuid())
   customerId String?     @map("customer_id")
   amount     Float
-  status     String      @default("pending") // pending, paid, confirmed, packed, shipped, delivered, cancelled
+  status     String      @default("pending") // pending, paid, confirmed, packed, shipped, delivered, cancelled, returned
   paymentId  String?     @map("payment_id")
   address    String
   createdAt  DateTime    @default(now()) @map("created_at")
@@ -82,6 +89,7 @@ model Order {
   items      OrderItem[]
   payments   Payment[]
 
+  @@index([customerId])
   @@map("orders")
 }
 
@@ -94,6 +102,8 @@ model OrderItem {
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
+  @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 
@@ -108,19 +118,23 @@ model Payment {
   updatedAt     DateTime @updatedAt @map("updated_at")
   order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  @@index([orderId])
   @@map("payments")
 }
 
 model Review {
-  id         String   @id @default(uuid())
-  productId  String   @map("product_id")
-  customerId String   @map("customer_id")
+  id         String    @id @default(uuid())
+  productId  String    @map("product_id")
+  customerId String    @map("customer_id")
   rating     Int
   comment    String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  deletedAt  DateTime? @map("deleted_at")
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
+  @@index([productId])
+  @@index([customerId])
   @@map("reviews")
 }
 
@@ -141,6 +155,7 @@ model Category {
   slug      String    @unique
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
   products  Product[]
 
   @@map("categories")
@@ -158,3 +173,26 @@ model StoreSettings {
   @@map("store_settings")
 }
 
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  target    String
+  details   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("audit_logs")
+}

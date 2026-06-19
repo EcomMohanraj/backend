@@ -36,6 +36,42 @@ function LoginForm() {
     }
 
     try {
+      // 1. Try local Express backend login first
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+      let localLoginSuccess = false
+
+      try {
+        const response = await fetch(`${apiUrl}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            localLoginSuccess = true
+            // Store cookie for middleware
+            document.cookie = `milky_session_active=true; path=/; max-age=${7 * 24 * 60 * 60}`
+            router.push('/dashboard')
+            router.refresh()
+            return
+          }
+        } else {
+          const data = await response.json().catch(() => ({}))
+          if (data.error && data.error !== "Invalid credentials.") {
+            setError(data.error)
+            setLoading(false)
+            return
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend login connection failed, falling back to Supabase:', backendErr)
+      }
+
+      // 2. Fallback to Supabase
       const supabase = createClient()
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,

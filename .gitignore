@@ -7,6 +7,8 @@ dist/
 backend/dist/
 build/
 backend/build/
+.next/
+frontend/.next/
 
 # Environments and local configurations
 .env
