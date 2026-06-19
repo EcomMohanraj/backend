@@ -55,15 +55,19 @@ app.use("/api", apiRouter);
 app.use(globalErrorHandler);
 
 // Database check and server launch
-prisma
-  .$connect()
-  .then(() => {
-    console.log("PostgreSQL database connected successfully via Prisma.");
-    app.listen(PORT, () => {
-      console.log(`Server is running in dev mode on http://localhost:${PORT}`);
+if (!process.env.VERCEL) {
+  prisma
+    .$connect()
+    .then(() => {
+      console.log("PostgreSQL database connected successfully via Prisma.");
+      app.listen(PORT, () => {
+        console.log(`Server is running in dev mode on http://localhost:${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error("Critical: Database connection failed on startup!", err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error("Critical: Database connection failed on startup!", err);
-    process.exit(1);
-  });
+}
+
+export default app;
