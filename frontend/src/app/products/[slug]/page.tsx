@@ -148,7 +148,8 @@ export default function ProductDetail({ params }: { params: Promise<{ slug: stri
       const res = await fetch(`${apiUrl}/reviews`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({
           productId: product.id,

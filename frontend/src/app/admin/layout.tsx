@@ -43,7 +43,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+      await fetch(`${apiUrl}/auth/logout`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include'
+      }).catch(() => {})
       document.cookie = 'milky_session_active=; path=/; max-age=0'
       showToast('Logged out successfully', 'success')
       router.push('/login')

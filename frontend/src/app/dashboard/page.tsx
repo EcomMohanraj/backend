@@ -137,7 +137,11 @@ function DashboardContent() {
   const handleLogout = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+      await fetch(`${apiUrl}/auth/logout`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include'
+      }).catch(() => {})
       
       // Clear cookies
       document.cookie = 'milky_session_active=; path=/; max-age=0'
