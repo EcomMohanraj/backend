@@ -44,7 +44,8 @@ function LoginForm() {
         const response = await fetch(`${apiUrl}/auth/login`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
           },
           body: JSON.stringify({ email, password })
         })
