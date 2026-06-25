@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { prisma } from "../lib/prisma";
 import { AuthenticatedRequest } from "../middleware/auth";
+
 export const addressController = {
   async list(req: AuthenticatedRequest, res: Response) {
     try {
