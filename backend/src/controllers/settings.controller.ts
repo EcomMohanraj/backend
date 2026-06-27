@@ -13,7 +13,7 @@ export const settingsController = {
             id: "default",
             storeName: "Milky Mushrooms",
             contactNumber: "+91 99887 76655",
-            email: "contact@milkymushrooms.com",
+            email: "contact@milkymushroom.in",
             deliveryCharges: 50.0,
             taxPercentage: 5.0
           }
@@ -42,7 +42,7 @@ export const settingsController = {
           id: "default",
           storeName: storeName || "Milky Mushrooms",
           contactNumber: contactNumber || "+91 99887 76655",
-          email: email || "contact@milkymushrooms.com",
+          email: email || "contact@milkymushroom.in",
           deliveryCharges: Number(deliveryCharges) || 50.0,
           taxPercentage: Number(taxPercentage) || 5.0
         }

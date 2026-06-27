@@ -165,7 +165,7 @@ model StoreSettings {
   id              String   @id @default("default")
   storeName       String   @default("Milky Mushrooms") @map("store_name")
   contactNumber   String   @default("+91 99887 76655") @map("contact_number")
-  email           String   @default("contact@milkymushrooms.com")
+  email           String   @default("contact@milkymushroom.in")
   deliveryCharges Float    @default(50.0) @map("delivery_charges")
   taxPercentage   Float    @default(5.0) @map("tax_percentage")
   updatedAt       DateTime @updatedAt @map("updated_at")
