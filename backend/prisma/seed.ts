@@ -18,7 +18,7 @@ async function main() {
   await prisma.storeSettings.deleteMany();
 
   console.log("Seeding users...");
-  // Use exact requested admin email & password: admin@milkymushrooms.com / Admin@123
+  // Use exact requested admin email & password: admin@milkymushroom.in / Admin@123
   const adminPasswordHash = await bcrypt.hash("Admin@123", 10);
   const customerPasswordHash = await bcrypt.hash("password", 10);
 
@@ -26,7 +26,7 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       name: "Milky Mushrooms Admin",
-      email: "admin@milkymushrooms.com",
+      email: "admin@milkymushroom.in",
       passwordHash: adminPasswordHash,
       role: "admin",
     },
@@ -73,7 +73,7 @@ async function main() {
       id: "default",
       storeName: "Milky Mushrooms",
       contactNumber: "+91 99887 76655",
-      email: "contact@milkymushrooms.com",
+      email: "contact@milkymushroom.in",
       deliveryCharges: 50.0,
       taxPercentage: 5.0,
     },

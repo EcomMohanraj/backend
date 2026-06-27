@@ -298,7 +298,7 @@ export const orderController = {
       }) || {
         storeName: "Milky Mushrooms",
         contactNumber: "+91 99887 76655",
-        email: "contact@milkymushrooms.com",
+        email: "contact@milkymushroom.in",
         deliveryCharges: 50,
         taxPercentage: 5
       };
